@@ -3,91 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoldenHour High-Agency Production Engine</title>
-    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <title>GoldenHour Sync-Stream | Production 4-Node Ecosystem</title>
+    <!-- Stable Leaflet mapping infrastructure to completely fix the blank canvas bug -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        :root { --bg: #f8fafc; --text: #0f172a; --primary: #2563eb; --danger: #ef4444; --success: #10b981; }
+        :root { --bg: #f8fafc; --text: #0f172a; --primary: #2563eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .tabs { display: flex; gap: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; }
-        .tab-btn { background: none; border: none; font-size: 16px; font-weight: 600; cursor: pointer; color: #64748b; padding: 5px 10px; }
-        .tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .tab-btn { background: none; border: none; font-size: 15px; font-weight: 600; cursor: pointer; color: #64748b; padding: 8px 12px; border-radius: 6px; }
+        .tab-btn.active { color: var(--primary); background: #eff6ff; border-bottom: 2px solid var(--primary); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .offline-banner { background: var(--danger); color: white; padding: 12px; text-align: center; font-weight: 800; border-radius: 8px; margin-bottom: 20px; display: none; }
         .live-badge { background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
-        .workspace { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; height: 70vh; }
+        
+        /* Layout Framework grids */
+        .workspace { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; height: 65vh; }
         #map { width: 100%; height: 100%; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
-        .live-panel { height: 100%; overflow-y: auto; padding-right: 5px; }
-        .service-card { background: white; padding: 14px; border-radius: 10px; border-left: 5px solid #cbd5e1; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center; }
-        .card-details h4 { margin: 0; font-size: 15px; color: var(--text); }
+        .live-panel { height: 100%; overflow-y: auto; background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-sizing: border-box; }
+        
+        .service-card { background: #f8fafc; padding: 14px; border-radius: 10px; border-left: 5px solid #cbd5e1; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .card-details h4 { margin: 0; font-size: 15px; }
         .card-details p { margin: 4px 0 0 0; font-size: 13px; color: #64748b; }
-        .call-btn { background: #f1f5f9; color: var(--primary); text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
-        .control-panel { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .status-box { background: #e0f2fe; color: #0369a1; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; }
+        .call-btn { background: white; color: var(--primary); border: 1px solid #chd5e1; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        
+        .action-btn { width: 100%; background: var(--danger); color: white; border: none; padding: 14px; font-size: 16px; font-weight: 700; border-radius: 10px; cursor: pointer; margin-bottom: 15px; }
+        .status-box { background: #e0f2fe; color: #0369a1; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #0284c7; }
+        
+        /* Dashboard styling rules */
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .dashboard-card { background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; }
+        .vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .vital-badge { background: #f1f5f9; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
 
     <header>
         <div>
-            <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">GoldenHour Sync-Stream 🛰️</h1>
+            <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">GoldenHour Sync-Stream ⚡</h1>
             <small style="color:#64748b; font-weight: 500;">Dynamic Hybrid-Caching Production Infrastructure</small>
         </div>
         <div style="display: flex; align-items: center; gap: 15px;">
-            <label style="font-weight:700; cursor:pointer; font-size: 14px; color: var(--text);">
+            <label style="font-weight:700; cursor:pointer; font-size: 14px;">
                 <input type="checkbox" id="networkToggle"> Force Offline Mode
             </label>
             <div id="streamIndicator" class="live-badge">🔴 Pipeline Standby</div>
         </div>
     </header>
 
-    <div class="offline-banner" id="offlineBanner">⚠️ OFFLINE CHANNELS ACTIVE: QUERING ON-DEVICE INTERCEPT STORAGE (INDEXEDDB)</div>
+    <div class="offline-banner" id="offlineBanner">⚠️ OFFLINE CHANNELS ACTIVE: SERVING DATA DIRECTLY FROM LOCAL BRWOSER STORAGE (INDEXEDDB)</div>
 
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab(event, 'bystander')">🆘 Node 1: Bystander Map</button>
         <button class="tab-btn" onclick="switchTab(event, 'vanguard')">🎒 Node 2: Vanguard Responders</button>
-        <button class="tab-btn" onclick="switchTab(event, 'command')">🏥 Node 3: Command & Insurance</button>
+        <button class="tab-btn" onclick="switchTab(event, 'command')">💳 Node 3: Command & Insurance</button>
+        <button class="tab-btn" onclick="switchTab(event, 'hospital')">🏥 Node 4: Hospital ER Room</button>
     </div>
 
+    <!-- NODE 1: BYSTANDER USER MAP MAP -->
     <div id="bystander" class="tab-content active">
-        <div class="control-panel">
-            <button class="tab-btn" style="background:var(--danger); color:white; width:100%; padding:14px; border-radius:8px; font-weight:800; font-size:16px;" id="trackingBtn" onclick="toggleTrackingState()">⚡ ENGAGE LIVE TRACKING ENGINE</button>
-            <div id="smsBox" style="display:none; margin-top:10px;">
-                <a id="smsLink" href="#" style="display:block; text-align:center; background:#000; color:#fff; padding:12px; text-decoration:none; border-radius:8px; font-weight:bold;">📱 DISPATCH SMS VIA CELLULAR TOWER</a>
-            </div>
+        <button class="action-btn" id="trackingBtn" onclick="toggleTrackingState()">⚡ ENGAGE LIVE TRACKING ENGINE</button>
+        <div id="smsBox" style="display:none; margin-top:-5px; margin-bottom:15px;">
+            <a id="smsLink" href="#" style="display:block; text-align:center; background:#000; color:#fff; padding:12px; text-decoration:none; border-radius:10px; font-weight:bold;">📱 DISPATCH SMS VIA CELLULAR TOWER</a>
         </div>
         
         <div class="workspace">
             <div id="map"></div>
             <div class="live-panel">
-                <h3 style="margin-top:0; font-size:16px; font-weight:800;">🌍 Dynamic Facilities (Real-Time Sorted)</h3>
-                <div id="liveDirectoryList">Awaiting telemetry handshake initialization frames...</div>
+                <h3 style="margin-top:0; font-size:16px; font-weight:800;">🌍 Closest Facilities (Real-Time Sorted)</h3>
+                <div id="liveDirectoryList">Awaiting system telemetry handshake framework setup...</div>
             </div>
         </div>
     </div>
 
+    <!-- NODE 2: VANGUARD RESPONDERS RESPONDERS -->
     <div id="vanguard" class="tab-content">
-        <h3>Decentralized Responder Fleet Tracking</h3>
-        <div id="vanguardStatus">Awaiting highway incident frame allocation...</div>
+        <div class="grid-3">
+            <div class="dashboard-card">
+                <h3 style="margin-top:0;">🎒 Active Dispatch Mission</h3>
+                <div id="vanguardStatus">Awaiting road accident metrics allocation...</div>
+            </div>
+            <div class="dashboard-card">
+                <h3 style="margin-top:0;">📋 Critical First Aid Rules</h3>
+                <ul style="padding-left:20px; font-size:14px; line-height:1.6;">
+                    <li><b>Airway Control:</b> Secure cervical spine position before structural handling.</li>
+                    <li><b>Hemorrhage Management:</b> Apply clean target pressure wrap loops instantly.</li>
+                    <li><b>Do Not:</b> Administer oral fluids to unconscious road trauma targets.</li>
+                </ul>
+            </div>
+        </div>
     </div>
 
+    <!-- NODE 3: COMMAND & INSURANCE -->
     <div id="command" class="tab-content">
-        <h3>Ayushman Bharat (ABHA) Ledger Intercept</h3>
-        <div id="commandStatus">Central stack infrastructure checking normal.</div>
+        <div class="grid-3">
+            <div class="dashboard-card" style="grid-column: span 2;">
+                <h3 style="margin-top:0;">💳 Ayushman Bharat (ABHA) Ledger Streams</h3>
+                <div id="commandStatus">Telemetry link checking normal. Awaiting transaction pipeline launch.</div>
+            </div>
+            <div class="dashboard-card">
+                <h3 style="margin-top:0;">🔒 Protocol Audit Checks</h3>
+                <p style="font-size:13px; color:#64748b;">programmatic escrow approvals guarantee that destination trauma rooms cannot refuse care based on deposit requirements.</p>
+                <div class="vital-badge" style="background:#e0f2fe; color:#0369a1;">Standard Coverage: Approved (Up to ₹50,000)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NODE 4: HOSPITAL ER ROOM -->
+    <div id="hospital" class="tab-content">
+        <div class="grid-3">
+            <div class="dashboard-card" style="border-top: 5px solid var(--danger);">
+                <h3 style="margin-top:0; color:var(--danger);">🚨 Incoming Trauma Alert</h3>
+                <div id="hospitalAlertStatus">No incoming trauma dispatches currently tracked.</div>
+            </div>
+            <div class="dashboard-card">
+                <h3 style="margin-top:0;">🚑 Telemetry Metrics Stream</h3>
+                <div id="hospitalVitalsStream">Awaiting operational vehicle telemetry array connection...</div>
+            </div>
+            <div class="dashboard-card">
+                <h3 style="margin-top:0;">🏥 Resource Allocation</h3>
+                <div class="vitals-grid">
+                    <div class="vital-badge">ER Bed 03: STAGED</div>
+                    <div class="vital-badge">Trauma Surgeon: NOTIFIED</div>
+                    <div class="vital-badge">Blood Supply: O-VE READY</div>
+                    <div class="vital-badge">Ventilator 02: ALLOCATED</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        // BACKEND LOGISTICS CONFIGURATION - CHANGE TO YOUR LIVE RENDER SERVER URL
         const BACKEND_WS_URL = "wss://https://goldenhour-backend.onrender.com/ws/emergency";
         
-        // Initialize Dexie On-Device Database Core Interface
         const db = new Dexie("GoldenHourCacheDB");
-        db.version(1).stores({
-            infrastructure: '++id, name, lat, lon, phone, category, distance_km'
-        });
+        db.version(1).stores({ infrastructure: '++id, name, lat, lon, phone, category' });
 
         let socket;
         let watchId = null;
@@ -95,18 +150,16 @@
         let isOffline = false;
         
         let map;
-        let userMarkerElement;
         let userMarker;
         let activeMarkers = [];
         let currentLat = 21.1250;
         let currentLon = 79.0600;
 
-        map = new maplibregl.Map({
-            container: 'map',
-            style: 'https://demotiles.maplibre.org/style.json',
-            center: [currentLon, currentLat],
-            zoom: 13
-        });
+        // Leaflet Engine Initialization to completely eliminate the blank yellow canvas bug
+        map = L.map('map').setView([currentLat, currentLon], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
         document.getElementById('networkToggle').addEventListener('change', (e) => {
             isOffline = e.target.checked;
@@ -129,7 +182,7 @@
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             event.target.classList.add('active');
-            setTimeout(() => { map.resize(); }, 200); 
+            setTimeout(() => { map.invalidateSize(); }, 200); 
         }
 
         function toggleTrackingState() {
@@ -180,7 +233,7 @@
             socket.onmessage = (event) => {
                 if (!isOffline) {
                     const payload = JSON.parse(event.data);
-                    cacheIncomingInfrastructure(payload.static_infrastructure); // CRITICAL: Run background caching engine
+                    cacheIncomingInfrastructure(payload.static_infrastructure);
                     renderRealTimeData(payload);
                 }
             };
@@ -191,16 +244,11 @@
             currentLat = lat; currentLon = lon;
 
             if (!userMarker) {
-                userMarkerElement = document.createElement('div');
-                userMarkerElement.style.width = '15px'; userMarkerElement.style.height = '15px';
-                userMarkerElement.style.backgroundColor = 'var(--primary)'; userMarkerElement.style.borderRadius = '50%';
-                userMarkerElement.style.border = '3px solid white'; userMarkerElement.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
-                
-                userMarker = new maplibregl.Marker({ element: userMarkerElement }).setLngLat([lon, lat]).addTo(map);
+                userMarker = L.marker([lat, lon]).addTo(map).bindPopup("Active Accident Node");
             } else {
-                userMarker.setLngLat([lon, lat]);
+                userMarker.setLatLng([lat, lon]);
             }
-            map.panTo([lon, lat]);
+            map.panTo([lat, lon]);
 
             if (isOffline) {
                 executeOfflinePipeline(lat, lon);
@@ -209,11 +257,9 @@
             }
         }
 
-        // --- THE SPATIAL CACHING ENGINE (INDEXEDDB WRITER) ---
         async function cacheIncomingInfrastructure(staticInfrastructure) {
             Object.keys(staticInfrastructure).forEach(category => {
                 staticInfrastructure[category].forEach(async (item) => {
-                    // Check if node is unique, then save it straight onto device silicon storage
                     const exists = await db.infrastructure.where("name").equals(item.name).count();
                     if (exists === 0) {
                         await db.infrastructure.add({
@@ -231,14 +277,11 @@
             return Math.round((R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))) * 10) / 10;
         }
 
-        // --- THE TRUE OFFLINE EDGE PARSING PIPELINE ---
         async function executeOfflinePipeline(lat, lon) {
             document.getElementById('smsBox').style.display = 'block';
-            document.getElementById('smsLink').href = `sms:112?body=CRITICAL%20ROAD%20SOS%20at%20Lat:%20${lat.toFixed(4)},%20Lon:%20${lon.toFixed(4)}`;
+            document.getElementById('smsLink').href = `sms:112?body=CRITICAL%20ROAD%20ACCIDENT%20AT%20Lat:%20${lat.toFixed(4)},%20Lon:%20${lon.toFixed(4)}`;
 
-            // Query the browser database hardware directly. Pulls ALL unique real nodes stored across India maps!
             const cachedItems = await db.infrastructure.toArray();
-            
             let structuredOutput = { hospitals: [], police: [], towing: [], puncture: [], showrooms: [] };
 
             cachedItems.forEach(node => {
@@ -254,8 +297,8 @@
 
             renderRealTimeData({
                 static_infrastructure: structuredOutput,
-                vanguard_fleet: { name: "Local First-Aid Fleet (Offline Cache Local)", eta_minutes: structuredOutput.hospitals.length > 0 ? Math.round(structuredOutput.hospitals[0].distance_km * 2.1) : "--", lat: lat+0.002, lon: lon+0.002 },
-                abha_insurance: { secure_token: "INDEXEDDB-FAILSAFE-VERIFIED", status: "OFFLINE SECURED" }
+                vanguard_fleet: { name: "Vanguard Team Node (Offline Local Mode)", eta_minutes: structuredOutput.hospitals.length > 0 ? Math.round(structuredOutput.hospitals[0].distance_km * 2.1) : "--", lat: lat+0.002, lon: lon+0.002 },
+                abha_insurance: { secure_token: "INDEXEDDB-LOCAL-CACHE", status: "PENDING SERVER SYNC" }
             });
         }
 
@@ -264,7 +307,7 @@
             const listContainer = document.getElementById('liveDirectoryList');
             listContainer.innerHTML = '';
             
-            activeMarkers.forEach(m => m.remove());
+            activeMarkers.forEach(m => map.removeLayer(m));
             activeMarkers = [];
 
             const schemas = [
@@ -288,29 +331,52 @@
                             </div>`;
 
                         if (item.lat && item.lon) {
-                            let popup = new maplibregl.Popup({ offset: 25 }).setHTML(`<b>[${schema.name}] ${item.name}</b>`);
-                            let markerElement = document.createElement('div');
-                            markerElement.style.width = '12px'; markerElement.style.height = '12px';
-                            markerElement.style.backgroundColor = schema.color; markerElement.style.borderRadius = '50%'; markerElement.style.border = '2px solid white';
-
-                            let marker = new maplibregl.Marker({ element: markerElement }).setLngLat([item.lon, item.lat]).setPopup(popup).addTo(map);
+                            let marker = L.marker([item.lat, item.lon]).addTo(map)
+                                .bindPopup(`<b>${item.name}</b><br>Phone: ${item.phone}`);
                             activeMarkers.push(marker);
                         }
                     });
                 }
             });
 
+            // UPDATE TAB 2 (VANGUARD DISPATCH NODE)
             document.getElementById('vanguardStatus').innerHTML = `
-                <div class="status-box" style="background:#fee2e2; color:#991b1b;">🎒 CORRIDOR FLEET CONNECTED</div>
+                <div class="status-box" style="background:#fef2f2; color:#991b1b; border-left-color:var(--danger);">🚨 DISPATCH RUNNING CONTINUOUSLY</div>
                 <div class="service-card" style="border-left-color:var(--primary)">
-                    <div class="card-details"><h4>${frame.vanguard_fleet.name}</h4><p>Live ETA: <b>${frame.vanguard_fleet.eta_minutes} Mins</b></p></div>
+                    <div class="card-details">
+                        <h4>Assigned: ${frame.vanguard_fleet.name}</h4>
+                        <p>Dynamic Intercept ETA: <b>${frame.vanguard_fleet.eta_minutes} Minutes</b></p>
+                        <p>Current GPS Marker: ${frame.vanguard_fleet.lat.toFixed(4)}, ${frame.vanguard_fleet.lon.toFixed(4)}</p>
+                    </div>
                 </div>`;
 
+            // UPDATE TAB 3 (COMMAND & INSURANCE LOOPS)
             document.getElementById('commandStatus').innerHTML = `
-                <div class="status-box">💳 INSURTECH TRANSACTIONS SECURED</div>
+                <div class="status-box" style="background:#eff6ff; color:#1e40af; border-left-color:var(--primary);">🔒 SYSTEM INTEGRATION SECURED</div>
                 <div class="service-card" style="border-left-color:var(--success)">
-                    <div class="card-details"><h4>Token Hash: <code>${frame.abha_insurance.secure_token}</code></h4><p>Status: <b>${frame.abha_insurance.status}</b></p></div>
+                    <div class="card-details">
+                        <h4>ABHA Gateway Reference: <code>${frame.abha_insurance.secure_token}</code></h4>
+                        <p>Pre-Authorization Pool Status: <b>${frame.abha_insurance.status}</b></p>
+                        <p>Escrow Verification: ₹50,000 Emergency surgical credit cleared for dispatch target.</p>
+                    </div>
                 </div>`;
+
+            // UPDATE TAB 4 (HOSPITAL ER LIVE PANEL)
+            const targetedHospital = s.hospitals.length > 0 ? s.hospitals[0].name : "Regional Trauma Care Base";
+            document.getElementById('hospitalAlertStatus').innerHTML = `
+                <div class="status-box" style="background:#fff7ed; color:#c2410c; border-left-color:var(--warning);">⚠️ PREPARING TRAUMA BAY</div>
+                <p style="font-size:14px; margin:0;">Target Intake Hub: <b>${targetedHospital}</b></p>
+                <p style="font-size:14px; margin-top:5px;">Estimated Arrival Countdown: <b style="color:var(--danger);">${frame.vanguard_fleet.eta_minutes} Mins</b></p>
+            `;
+            
+            document.getElementById('hospitalVitalsStream').innerHTML = `
+                <div class="vitals-grid">
+                    <div class="vital-badge" style="color:var(--danger)">❤️ Heart Rate: 104 BPM</div>
+                    <div class="vital-badge" style="color:var(--primary)">🫁 SpO2 Level: 94%</div>
+                    <div class="vital-badge">🩸 BP Status: 110/72</div>
+                    <div class="vital-badge" style="color:var(--warning)">🧠 GCS Rating: E3V4M5 (Moderate)</div>
+                </div>
+            `;
         }
 
         function simulateMovement() {
