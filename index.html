@@ -27,9 +27,31 @@
         
         /* Camera UI Components */
         .camera-panel { background: white; padding: 20px; border-radius: 16px; margin-bottom: 15px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .viewfinder-wrapper { background: #000; border-radius: 12px; overflow: hidden; height: 220px; position: relative; display: flex; align-items: center; justify-content: center; }
-        #videoViewfinder { width: 100%; height: 100%; object-fit: cover; }
-        #capturedCanvas { width: 100%; height: 100%; object-fit: cover; display: none; background: #1e293b; }
+        .viewfinder-wrapper { 
+            background: #000; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            width: 100%;
+            max-width: 340px; /* Constrains width on desktop frames */
+            aspect-ratio: 1 / 1; /* Forces a perfect square bounding box */
+            position: relative; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin: 0 auto;
+        }
+        #videoViewfinder { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; /* Crops stream to square without distortion */
+        }
+        #capturedCanvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: none; 
+            background: #1e293b; 
+        }
         
         .service-card { background: #f8fafc; padding: 14px; border-radius: 10px; border-left: 5px solid #cbd5e1; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .card-details h4 { margin: 0; font-size: 15px; }
@@ -197,33 +219,41 @@
         }
 
         function captureSceneSnapshot() {
-            const video = document.getElementById('videoViewfinder');
-            const canvas = document.getElementById('capturedCanvas');
-            const context = canvas.getContext('2d');
+        const video = document.getElementById('videoViewfinder');
+        const canvas = document.getElementById('capturedCanvas');
+        const context = canvas.getContext('2d');
 
-            if (cameraStream && video.srcObject) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                // Draw current active camera frame buffer matrix right onto canvas silicon layer
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Toggle interface states instantly
-                video.style.display = 'none';
-                canvas.style.display = 'block';
-                document.getElementById('captureBtn').style.display = 'none';
-                document.getElementById('resetCameraBtn').style.display = 'block';
-            }
-
-            // Fire the tracking pipelines instantly on snapshot capture click
-            if(!systemActive) {
-                startPipeline();
-            } else {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => { handleTelemetryUpdate(pos.coords.latitude, pos.coords.longitude); },
-                    () => { handleTelemetryUpdate(21.1250, 79.0600); }
-                );
+        if (cameraStream && video.srcObject) {
+            canvas.width = 340; // Maintain optimized aspect bounds
+            canvas.height = 340; 
+            
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            document.getElementById('captureBtn').style.display = 'none';
+            document.getElementById('resetCameraBtn').style.display = 'block';
+            
+            // Compress canvas pixels into a standard base64 image data string
+            const base64ImagePayload = canvas.toDataURL('image/jpeg', 0.7);
+            
+            // Wake up system tracking loops and pass telemetry alongside the image payload
+            systemActive = true;
+            if (!isOffline) {
+                connectWebSocket();
+                // Wait briefly for connection handshake, then transmit the complete data payload
+                setTimeout(() => {
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({
+                            lat: currentLat,
+                            lon: currentLon,
+                            image: base64ImagePayload
+                        }));
+                    }
+                }, 1000);
             }
         }
+    }
 
         function resetHardwareViewfinder() {
             document.getElementById('videoViewfinder').style.display = 'block';
