@@ -1,7 +1,0 @@
-{
-  "hospitals": [{"name": "Regional Trauma Care Hub (Offline Cache)", "distance_km": 1.1, "phone": "108"}],
-  "police": [{"name": "Highway Patrol Outpost (Offline Cache)", "distance_km": 0.8, "phone": "112"}],
-  "towing": [{"name": "National Tow & Highway Rescue", "distance_km": 2.4, "phone": "+91 99999 99999"}],
-  "puncture": [{"name": "24/7 Mobile Tyre Service", "distance_km": 1.5, "phone": "+91 88888 88888"}],
-  "showrooms": [{"name": "Authorized Vehicle Service Center", "distance_km": 4.0, "phone": "112"}]
-}

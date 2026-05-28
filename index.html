@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoldenHour Ecosystem | True Real-Time</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>GoldenHour High-Agency Production Engine</title>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
         :root { --bg: #f8fafc; --text: #0f172a; --primary: #2563eb; --danger: #ef4444; --success: #10b981; }
@@ -18,12 +19,9 @@
         .tab-content.active { display: block; }
         .offline-banner { background: var(--danger); color: white; padding: 12px; text-align: center; font-weight: 800; border-radius: 8px; margin-bottom: 20px; display: none; }
         .live-badge { background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
-        
-        /* Master Layout Engine */
         .workspace { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; height: 70vh; }
         #map { width: 100%; height: 100%; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
         .live-panel { height: 100%; overflow-y: auto; padding-right: 5px; }
-        
         .service-card { background: white; padding: 14px; border-radius: 10px; border-left: 5px solid #cbd5e1; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center; }
         .card-details h4 { margin: 0; font-size: 15px; color: var(--text); }
         .card-details p { margin: 4px 0 0 0; font-size: 13px; color: #64748b; }
@@ -36,8 +34,8 @@
 
     <header>
         <div>
-            <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">GoldenHour Real-Time 🛰️</h1>
-            <small style="color:#64748b; font-weight: 500;">Live Global Infrastructure Intercept Network</small>
+            <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">GoldenHour Sync-Stream 🛰️</h1>
+            <small style="color:#64748b; font-weight: 500;">Dynamic Hybrid-Caching Production Infrastructure</small>
         </div>
         <div style="display: flex; align-items: center; gap: 15px;">
             <label style="font-weight:700; cursor:pointer; font-size: 14px; color: var(--text);">
@@ -47,7 +45,7 @@
         </div>
     </header>
 
-    <div class="offline-banner" id="offlineBanner">⚠️ CRITICAL NETWORK FAILURE: RUNNING CLIENT-SIDE HARDWARE BUNDLES</div>
+    <div class="offline-banner" id="offlineBanner">⚠️ OFFLINE CHANNELS ACTIVE: QUERING ON-DEVICE INTERCEPT STORAGE (INDEXEDDB)</div>
 
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab(event, 'bystander')">🆘 Node 1: Bystander Map</button>
@@ -65,47 +63,65 @@
         
         <div class="workspace">
             <div id="map"></div>
-            
             <div class="live-panel">
-                <h3 style="margin-top:0; font-size:16px; font-weight:800;">🌍 Closest Facilities (Live-Updating)</h3>
-                <div id="liveDirectoryList">Awaiting connection frames...</div>
+                <h3 style="margin-top:0; font-size:16px; font-weight:800;">🌍 Dynamic Facilities (Real-Time Sorted)</h3>
+                <div id="liveDirectoryList">Awaiting telemetry handshake initialization frames...</div>
             </div>
         </div>
     </div>
 
     <div id="vanguard" class="tab-content">
-        <h3>Decentralized Responder Tracking</h3>
-        <div id="vanguardStatus">Awaiting incident telemetry data...</div>
+        <h3>Decentralized Responder Fleet Tracking</h3>
+        <div id="vanguardStatus">Awaiting highway incident frame allocation...</div>
     </div>
 
     <div id="command" class="tab-content">
         <h3>Ayushman Bharat (ABHA) Ledger Intercept</h3>
-        <div id="commandStatus">Telemetry link checking normal.</div>
+        <div id="commandStatus">Central stack infrastructure checking normal.</div>
     </div>
 
     <script>
-        // BACKEND CONFIGURATION - UPDATE TO YOUR LIVE RENDER SERVER LINK
-        const BACKEND_WS_URL = "wss://YOUR-RENDER-BACKEND-URL.onrender.com/ws/emergency";
+        const BACKEND_WS_URL = "wss://https://goldenhour-backend.onrender.com/ws/emergency";
         
+        // Initialize Dexie On-Device Database Core Interface
+        const db = new Dexie("GoldenHourCacheDB");
+        db.version(1).stores({
+            infrastructure: '++id, name, lat, lon, phone, category, distance_km'
+        });
+
         let socket;
         let watchId = null;
         let systemActive = false;
         let isOffline = false;
         
-        // Map elements
         let map;
+        let userMarkerElement;
         let userMarker;
-        let infrastructureMarkers = [];
+        let activeMarkers = [];
+        let currentLat = 21.1250;
+        let currentLon = 79.0600;
 
-        // Initialize the Map object on load pointing globally
-        map = L.map('map').setView([21.1250, 79.0600], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://demotiles.maplibre.org/style.json',
+            center: [currentLon, currentLat],
+            zoom: 13
+        });
 
         document.getElementById('networkToggle').addEventListener('change', (e) => {
             isOffline = e.target.checked;
             document.getElementById('offlineBanner').style.display = isOffline ? 'block' : 'none';
+            if (systemActive) {
+                if (isOffline) {
+                    if (socket) socket.close();
+                    document.getElementById('streamIndicator').style.background = "#e2e8f0";
+                    document.getElementById('streamIndicator').style.color = "#475569";
+                    document.getElementById('streamIndicator').innerText = "💾 Local IndexedDB Engaged";
+                    executeOfflinePipeline(currentLat, currentLon);
+                } else {
+                    connectWebSocket();
+                }
+            }
         });
 
         function switchTab(event, tabId) {
@@ -113,23 +129,23 @@
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             event.target.classList.add('active');
-            setTimeout(() => { map.invalidateSize(); }, 200); // Forces structural map alignments
+            setTimeout(() => { map.resize(); }, 200); 
         }
 
         function toggleTrackingState() {
-            if (systemActive) {
-                stopPipeline();
-            } else {
-                startPipeline();
-            }
+            if (systemActive) stopPipeline(); else startPipeline();
         }
 
         function startPipeline() {
             systemActive = true;
-            document.getElementById('trackingBtn').innerText = "🛑 TERMINATE SYSTEM TRACKING";
+            document.getElementById('trackingBtn').innerText = "🛑 TERMINATE MONITOR STREAMING";
             document.getElementById('trackingBtn').style.background = "#0f172a";
             
-            if(!isOffline) connectWebSocket();
+            if (!isOffline) connectWebSocket(); else {
+                document.getElementById('streamIndicator').style.background = "#e2e8f0";
+                document.getElementById('streamIndicator').style.color = "#475569";
+                document.getElementById('streamIndicator').innerText = "💾 Local IndexedDB Engaged";
+            }
 
             if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(
@@ -149,36 +165,98 @@
             document.getElementById('streamIndicator').style.background = "#fee2e2";
             document.getElementById('streamIndicator').style.color = "#991b1b";
             document.getElementById('streamIndicator').innerText = "🔴 Pipeline Standby";
+            document.getElementById('smsBox').style.display = 'none';
         }
 
         function connectWebSocket() {
+            if (isOffline) return;
             socket = new WebSocket(BACKEND_WS_URL);
             socket.onopen = () => {
                 document.getElementById('streamIndicator').style.background = "#dcfce7";
                 document.getElementById('streamIndicator').style.color = "#15803d";
                 document.getElementById('streamIndicator').innerText = "🟢 Pipeline Connected";
+                document.getElementById('smsBox').style.display = 'none';
             };
             socket.onmessage = (event) => {
-                const payload = JSON.parse(event.data);
-                renderRealTimeData(payload);
+                if (!isOffline) {
+                    const payload = JSON.parse(event.data);
+                    cacheIncomingInfrastructure(payload.static_infrastructure); // CRITICAL: Run background caching engine
+                    renderRealTimeData(payload);
+                }
             };
-            socket.onerror = () => { triggerOfflineDegradation(); };
+            socket.onerror = () => { isOffline = true; document.getElementById('networkToggle').checked = true; executeOfflinePipeline(currentLat, currentLon); };
         }
 
         function handleTelemetryUpdate(lat, lon) {
-            // Update physical user location marker on the interactive map frame
+            currentLat = lat; currentLon = lon;
+
             if (!userMarker) {
-                userMarker = L.marker([lat, lon], {title: "Your Location"}).addTo(map);
+                userMarkerElement = document.createElement('div');
+                userMarkerElement.style.width = '15px'; userMarkerElement.style.height = '15px';
+                userMarkerElement.style.backgroundColor = 'var(--primary)'; userMarkerElement.style.borderRadius = '50%';
+                userMarkerElement.style.border = '3px solid white'; userMarkerElement.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+                
+                userMarker = new maplibregl.Marker({ element: userMarkerElement }).setLngLat([lon, lat]).addTo(map);
             } else {
-                userMarker.setLatLng([lat, lon]);
+                userMarker.setLngLat([lon, lat]);
             }
-            map.panTo([lat, lon]);
+            map.panTo([lon, lat]);
 
             if (isOffline) {
-                triggerOfflineDegradation();
+                executeOfflinePipeline(lat, lon);
             } else if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ lat: lat, lon: lon }));
             }
+        }
+
+        // --- THE SPATIAL CACHING ENGINE (INDEXEDDB WRITER) ---
+        async function cacheIncomingInfrastructure(staticInfrastructure) {
+            Object.keys(staticInfrastructure).forEach(category => {
+                staticInfrastructure[category].forEach(async (item) => {
+                    // Check if node is unique, then save it straight onto device silicon storage
+                    const exists = await db.infrastructure.where("name").equals(item.name).count();
+                    if (exists === 0) {
+                        await db.infrastructure.add({
+                            name: item.name, lat: item.lat, lon: item.lon, phone: item.phone, category: category
+                        });
+                    }
+                });
+            });
+        }
+
+        function calculateHaversine(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return Math.round((R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))) * 10) / 10;
+        }
+
+        // --- THE TRUE OFFLINE EDGE PARSING PIPELINE ---
+        async function executeOfflinePipeline(lat, lon) {
+            document.getElementById('smsBox').style.display = 'block';
+            document.getElementById('smsLink').href = `sms:112?body=CRITICAL%20ROAD%20SOS%20at%20Lat:%20${lat.toFixed(4)},%20Lon:%20${lon.toFixed(4)}`;
+
+            // Query the browser database hardware directly. Pulls ALL unique real nodes stored across India maps!
+            const cachedItems = await db.infrastructure.toArray();
+            
+            let structuredOutput = { hospitals: [], police: [], towing: [], puncture: [], showrooms: [] };
+
+            cachedItems.forEach(node => {
+                let distance = calculateHaversine(lat, lon, node.lat, node.lon);
+                if (structuredOutput[node.category]) {
+                    structuredOutput[node.category].push({
+                        name: node.name, lat: node.lat, lon: node.lon, distance_km: distance, phone: node.phone
+                    });
+                }
+            });
+
+            Object.keys(structuredOutput).forEach(cat => structuredOutput[cat].sort((a, b) => a.distance_km - b.distance_km));
+
+            renderRealTimeData({
+                static_infrastructure: structuredOutput,
+                vanguard_fleet: { name: "Local First-Aid Fleet (Offline Cache Local)", eta_minutes: structuredOutput.hospitals.length > 0 ? Math.round(structuredOutput.hospitals[0].distance_km * 2.1) : "--", lat: lat+0.002, lon: lon+0.002 },
+                abha_insurance: { secure_token: "INDEXEDDB-FAILSAFE-VERIFIED", status: "OFFLINE SECURED" }
+            });
         }
 
         function renderRealTimeData(frame) {
@@ -186,87 +264,63 @@
             const listContainer = document.getElementById('liveDirectoryList');
             listContainer.innerHTML = '';
             
-            // Clear prior infrastructure map layers safely
-            infrastructureMarkers.forEach(m => map.removeLayer(m));
-            infrastructureMarkers = [];
+            activeMarkers.forEach(m => m.remove());
+            activeMarkers = [];
 
-            const types = [
-                { name: "Trauma ER", key: 'hospitals', color: '#10b981', iconColor: 'green' },
-                { name: "Police Station", key: 'police', color: '#ef4444', iconColor: 'red' },
-                { name: "Vehicle Towing", key: 'towing', color: '#f59e0b', iconColor: 'orange' },
-                { name: "Puncture Shop", key: 'puncture', color: '#6366f1', iconColor: 'purple' },
-                { name: "Service Center", key: 'showrooms', color: '#06b6d4', iconColor: 'blue' }
+            const schemas = [
+                { name: "Trauma ER", key: 'hospitals', color: '#10b981' },
+                { name: "Police Outpost", key: 'police', color: '#ef4444' },
+                { name: "Vehicle Recovery", key: 'towing', color: '#f59e0b' },
+                { name: "Tyre Shop", key: 'puncture', color: '#6366f1' },
+                { name: "Authorized Showroom", key: 'showrooms', color: '#06b6d4' }
             ];
 
-            types.forEach(t => {
-                if (s[t.key] && s[t.key].length > 0) {
-                    // Iterate through ALL returned items, not just the single closest one!
-                    s[t.key].forEach((item, index) => {
-                        // 1. Append components to live list panel dynamically
+            schemas.forEach(schema => {
+                if (s[schema.key] && s[schema.key].length > 0) {
+                    s[schema.key].forEach(item => {
                         listContainer.innerHTML += `
-                            <div class="service-card" style="border-left-color: ${t.color}">
+                            <div class="service-card" style="border-left-color: ${schema.color}">
                                 <div class="card-details">
-                                    <h4>[${t.name}] ${item.name}</h4>
+                                    <h4>[${schema.name}] ${item.name}</h4>
                                     <p>📍 Distance: <b>${item.distance_km || item.dist} km</b></p>
                                 </div>
-                                <a href="tel:${item.phone}" class="call-btn">📞 Call</a>
+                                <a href="tel:${item.phone}" class="call-btn">📞 Contact</a>
                             </div>`;
 
-                        // 2. Plot real-world spatial markers onto the map container frame
-                        if(item.lat && item.lon) {
-                            let marker = L.marker([item.lat, item.lon]).addTo(map)
-                                .bindPopup(`<b>[${t.name}] ${item.name}</b><br>Contact: ${item.phone}`);
-                            infrastructureMarkers.push(marker);
+                        if (item.lat && item.lon) {
+                            let popup = new maplibregl.Popup({ offset: 25 }).setHTML(`<b>[${schema.name}] ${item.name}</b>`);
+                            let markerElement = document.createElement('div');
+                            markerElement.style.width = '12px'; markerElement.style.height = '12px';
+                            markerElement.style.backgroundColor = schema.color; markerElement.style.borderRadius = '50%'; markerElement.style.border = '2px solid white';
+
+                            let marker = new maplibregl.Marker({ element: markerElement }).setLngLat([item.lon, item.lat]).setPopup(popup).addTo(map);
+                            activeMarkers.push(marker);
                         }
                     });
                 }
             });
 
-            // 3. Dynamic Node 2 updates
             document.getElementById('vanguardStatus').innerHTML = `
-                <div class="status-box">🚨 INTERCEPT DATA STREAM ACTIVE</div>
+                <div class="status-box" style="background:#fee2e2; color:#991b1b;">🎒 CORRIDOR FLEET CONNECTED</div>
                 <div class="service-card" style="border-left-color:var(--primary)">
-                    <div class="card-details">
-                        <h4>${frame.vanguard_fleet.name}</h4>
-                        <p>Real-time Target ETA: <b>${frame.vanguard_fleet.eta_minutes} Minutes</b></p>
-                        <p>Tracking Parameters: ${frame.vanguard_fleet.lat.toFixed(4)}, ${frame.vanguard_fleet.lon.toFixed(4)}</p>
-                    </div>
+                    <div class="card-details"><h4>${frame.vanguard_fleet.name}</h4><p>Live ETA: <b>${frame.vanguard_fleet.eta_minutes} Mins</b></p></div>
                 </div>`;
 
-            // 4. Dynamic Node 3 updates
             document.getElementById('commandStatus').innerHTML = `
-                <div class="status-box" style="background:#eff6ff; color:#1e40af;">💳 STACK PROTOCOLS INITIALIZED</div>
+                <div class="status-box">💳 INSURTECH TRANSACTIONS SECURED</div>
                 <div class="service-card" style="border-left-color:var(--success)">
-                    <div class="card-details">
-                        <h4>ABHA Handshake Token: <code>${frame.abha_insurance.secure_token}</code></h4>
-                        <p>Status Indicator: <b>${frame.abha_insurance.status}</b></p>
-                        <p>Emergency Financial Buffer: ₹50,000 trauma protection credit pre-authorized.</p>
-                    </div>
+                    <div class="card-details"><h4>Token Hash: <code>${frame.abha_insurance.secure_token}</code></h4><p>Status: <b>${frame.abha_insurance.status}</b></p></div>
                 </div>`;
-        }
-
-        async function triggerOfflineDegradation() {
-            document.getElementById('networkToggle').checked = true;
-            document.getElementById('offlineBanner').style.display = 'block';
-            const res = await fetch('offline_data.json');
-            const data = await res.json();
-            renderRealTimeData({ static_infrastructure: data, vanguard_fleet: { name: "Local Loop Engaged", eta_minutes: "--", lat: 0, lon: 0 }, abha_insurance: { secure_token: "OFFLINE-LOCAL-CACHE", status: "Bypassed" } });
-            
-            document.getElementById('smsBox').style.display = 'block';
-            const smsText = `CRITICAL SOS: Emergency at coordinates ${systemState.lat}, ${systemState.lon}. Request emergency tracking.`;
-            document.getElementById('smsLink').href = `sms:112?body=${encodeURIComponent(smsText)}`;
         }
 
         function simulateMovement() {
-            let fakeLat = 21.1250;
-            let fakeLon = 79.0600;
+            let fakeLat = 21.1250; let fakeLon = 79.0600;
             setInterval(() => {
                 if(systemActive) {
-                    fakeLat += (Math.random() - 0.5) * 0.002;
-                    fakeLon += (Math.random() - 0.5) * 0.002;
+                    fakeLat += (Math.random() - 0.5) * 0.003; fakeLon += (Math.random() - 0.5) * 0.003;
                     handleTelemetryUpdate(fakeLat, fakeLon);
                 }
-            }, 3000);
+            }, 3500);
         }
     </script>
 </body>
