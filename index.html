@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoldenHour Ecosystem | IITM ROADSOS</title>
+    <title>GoldenHour Ecosystem | True Real-Time</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        :root { --bg: #f8fafc; --text: #0f172a; --primary: #2563eb; --danger: #ef4444; }
+        :root { --bg: #f8fafc; --text: #0f172a; --primary: #2563eb; --danger: #ef4444; --success: #10b981; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .tabs { display: flex; gap: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; }
@@ -14,77 +16,96 @@
         .tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .offline-banner { background: #ef4444; color: white; padding: 12px; text-align: center; font-weight: 800; border-radius: 8px; margin-bottom: 20px; display: none; }
-        .service-card { background: white; padding: 16px; border-radius: 12px; border-left: 6px solid #cbd5e1; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .service-card h4 { margin: 0 0 5px 0; font-size: 16px; color: #0f172a !important; }
-        .service-card p { margin: 0; font-size: 14px; color: #475569 !important; }
-        .service-card a { color: var(--primary); font-weight: bold; text-decoration: none; display: inline-block; margin-top: 5px; }
-        .trigger-btn { width: 100%; background: var(--danger); color: white; border: none; padding: 16px; font-size: 18px; font-weight: 800; border-radius: 12px; cursor: pointer; }
-        .status-box { background: #dcfce7; color: #14532d; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; }
+        .offline-banner { background: var(--danger); color: white; padding: 12px; text-align: center; font-weight: 800; border-radius: 8px; margin-bottom: 20px; display: none; }
+        .live-badge { background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
+        
+        /* Master Layout Engine */
+        .workspace { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; height: 70vh; }
+        #map { width: 100%; height: 100%; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+        .live-panel { height: 100%; overflow-y: auto; padding-right: 5px; }
+        
+        .service-card { background: white; padding: 14px; border-radius: 10px; border-left: 5px solid #cbd5e1; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center; }
+        .card-details h4 { margin: 0; font-size: 15px; color: var(--text); }
+        .card-details p { margin: 4px 0 0 0; font-size: 13px; color: #64748b; }
+        .call-btn { background: #f1f5f9; color: var(--primary); text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+        .control-panel { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .status-box { background: #e0f2fe; color: #0369a1; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
     <header>
         <div>
-            <h1 style="margin:0;">GoldenHour ⚡</h1>
-            <small style="color:#64748b;">IITM Road Safety Hackathon 2026 (ROADSOS)</small>
+            <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">GoldenHour Real-Time 🛰️</h1>
+            <small style="color:#64748b; font-weight: 500;">Live Global Infrastructure Intercept Network</small>
         </div>
-        <div>
-            <label style="font-weight:bold; cursor:pointer; color:#0f172a;">
-                <input type="checkbox" id="networkToggle"> Simulate Offline Mode
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <label style="font-weight:700; cursor:pointer; font-size: 14px; color: var(--text);">
+                <input type="checkbox" id="networkToggle"> Force Offline Mode
             </label>
+            <div id="streamIndicator" class="live-badge">🔴 Pipeline Standby</div>
         </div>
     </header>
 
-    <div class="offline-banner" id="offlineBanner">⚠️ EMERGENCY OFFLINE ENGINE ENGAGED: SERVING LOCAL ON-DEVICE INFRASTRUCTURE BUNDLES</div>
+    <div class="offline-banner" id="offlineBanner">⚠️ CRITICAL NETWORK FAILURE: RUNNING CLIENT-SIDE HARDWARE BUNDLES</div>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab(event, 'bystander')">🆘 Node 1: Bystander</button>
-        <button class="tab-btn" onclick="switchTab(event, 'vanguard')">🎒 Node 2: Vanguard Fleet</button>
-        <button class="tab-btn" onclick="switchTab(event, 'command')">🏥 Node 3: Command Hub</button>
+        <button class="tab-btn active" onclick="switchTab(event, 'bystander')">🆘 Node 1: Bystander Map</button>
+        <button class="tab-btn" onclick="switchTab(event, 'vanguard')">🎒 Node 2: Vanguard Responders</button>
+        <button class="tab-btn" onclick="switchTab(event, 'command')">🏥 Node 3: Command & Insurance</button>
     </div>
 
     <div id="bystander" class="tab-content active">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div>
-                <h3>Trigger Autonomous Road SOS</h3>
-                <p>The application instantly reads your physical hardware GPS coordinates and compiles the dispatch directory matrix.</p>
-                <button class="trigger-btn" onclick="initiateEmergency()">🚨 INITIATE ROAD SOS</button>
-                <div id="smsBox" style="display:none; margin-top:15px;">
-                    <a id="smsLink" href="#" style="display:block; text-align:center; background:#000; color:#fff; padding:15px; text-decoration:none; border-radius:12px; font-weight:bold;">📱 TRANSMIT OFFLINE CELLULAR SMS</a>
-                </div>
+        <div class="control-panel">
+            <button class="tab-btn" style="background:var(--danger); color:white; width:100%; padding:14px; border-radius:8px; font-weight:800; font-size:16px;" id="trackingBtn" onclick="toggleTrackingState()">⚡ ENGAGE LIVE TRACKING ENGINE</button>
+            <div id="smsBox" style="display:none; margin-top:10px;">
+                <a id="smsLink" href="#" style="display:block; text-align:center; background:#000; color:#fff; padding:12px; text-decoration:none; border-radius:8px; font-weight:bold;">📱 DISPATCH SMS VIA CELLULAR TOWER</a>
             </div>
-            <div>
-                <h3>🚑 Verified Emergency Contacts</h3>
-                <div id="directoryLogs">Trigger an SOS event above to scan geographic parameters.</div>
+        </div>
+        
+        <div class="workspace">
+            <div id="map"></div>
+            
+            <div class="live-panel">
+                <h3 style="margin-top:0; font-size:16px; font-weight:800;">🌍 Closest Facilities (Live-Updating)</h3>
+                <div id="liveDirectoryList">Awaiting connection frames...</div>
             </div>
         </div>
     </div>
 
     <div id="vanguard" class="tab-content">
-        <h3>Decentralized First Responder Network</h3>
-        <div id="vanguardStatus">Awaiting roadside incident metrics allocation...</div>
+        <h3>Decentralized Responder Tracking</h3>
+        <div id="vanguardStatus">Awaiting incident telemetry data...</div>
     </div>
 
     <div id="command" class="tab-content">
-        <h3>Integrated ER Financial Board</h3>
-        <div id="commandStatus">All roadway infrastructure telemetry checking normal.</div>
+        <h3>Ayushman Bharat (ABHA) Ledger Intercept</h3>
+        <div id="commandStatus">Telemetry link checking normal.</div>
     </div>
 
     <script>
-        // BACKEND BASE LINK - REPLACE WITH YOUR LIVE RENDER URL EXACTLY
-        const BACKEND_URL = "https://YOUR-RENDER-BACKEND-URL.onrender.com";
+        // BACKEND CONFIGURATION - UPDATE TO YOUR LIVE RENDER SERVER LINK
+        const BACKEND_WS_URL = "wss://YOUR-RENDER-BACKEND-URL.onrender.com/ws/emergency";
         
+        let socket;
+        let watchId = null;
+        let systemActive = false;
         let isOffline = false;
-        let systemState = { active: false, lat: 21.1250, lon: 79.0600, data: null };
+        
+        // Map elements
+        let map;
+        let userMarker;
+        let infrastructureMarkers = [];
+
+        // Initialize the Map object on load pointing globally
+        map = L.map('map').setView([21.1250, 79.0600], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
         document.getElementById('networkToggle').addEventListener('change', (e) => {
             isOffline = e.target.checked;
             document.getElementById('offlineBanner').style.display = isOffline ? 'block' : 'none';
-            if(systemState.active) {
-                executePipeline(systemState.lat, systemState.lon);
-            }
         });
 
         function switchTab(event, tabId) {
@@ -92,97 +113,160 @@
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             event.target.classList.add('active');
+            setTimeout(() => { map.invalidateSize(); }, 200); // Forces structural map alignments
         }
 
-        function initiateEmergency() {
-            navigator.geolocation.getCurrentPosition(
-                (position) => { executePipeline(position.coords.latitude, position.coords.longitude); },
-                () => { executePipeline(21.1250, 79.0600); alert("GPS Access Denied or Timed Out. Using regional reference array coordinates."); }
-            );
-        }
-
-        async function executePipeline(lat, lon) {
-            systemState.active = true;
-            systemState.lat = lat;
-            systemState.lon = lon;
-
-            if (isOffline) {
-                const res = await fetch('offline_data.json');
-                systemState.data = await res.json();
-                renderDirectory();
-                setupOfflineSMS();
-                document.getElementById('vanguardStatus').innerHTML = '<div>⚠️ Offline Mode: Distributed tracking paused.</div>';
-                document.getElementById('commandStatus').innerHTML = '<div>⚠️ Offline Mode: Central India Stack banking synchronization paused. Live routing will sync upon reconnection.</div>';
+        function toggleTrackingState() {
+            if (systemActive) {
+                stopPipeline();
             } else {
-                document.getElementById('smsBox').style.display = 'none';
-                try {
-                    const res = await fetch(`${BACKEND_URL}/api/emergency?lat=${lat}&lon=${lon}`);
-                    const payload = await res.json();
-                    systemState.data = payload.data;
-                    renderDirectory();
-                    updateEcosystemNodes();
-                } catch (err) {
-                    console.error(err);
-                    isOffline = true;
-                    document.getElementById('networkToggle').checked = true;
-                    document.getElementById('offlineBanner').style.display = 'block';
-                    executePipeline(lat, lon);
-                }
+                startPipeline();
             }
         }
 
-        function renderDirectory() {
-            const logs = document.getElementById('directoryLogs');
-            logs.innerHTML = '';
-            const s = systemState.data;
+        function startPipeline() {
+            systemActive = true;
+            document.getElementById('trackingBtn').innerText = "🛑 TERMINATE SYSTEM TRACKING";
+            document.getElementById('trackingBtn').style.background = "#0f172a";
+            
+            if(!isOffline) connectWebSocket();
 
-            const targets = [
-                { name: "Trauma Center & Ambulance", key: 'hospitals', color: '#10b981' },
-                { name: "Police Station Outpost", key: 'police', color: '#ef4444' },
-                { name: "Vehicle Rescue & Towing", key: 'towing', color: '#f59e0b' },
-                { name: "Roadside Puncture Shops", key: 'puncture', color: '#6366f1' },
-                { name: "Authorized Showrooms & Centers", key: 'showrooms', color: '#06b6d4' }
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(
+                    (pos) => { handleTelemetryUpdate(pos.coords.latitude, pos.coords.longitude); },
+                    () => { simulateMovement(); },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            }
+        }
+
+        function stopPipeline() {
+            systemActive = false;
+            document.getElementById('trackingBtn').innerText = "⚡ ENGAGE LIVE TRACKING ENGINE";
+            document.getElementById('trackingBtn').style.background = "var(--danger)";
+            if(watchId) navigator.geolocation.clearWatch(watchId);
+            if(socket) socket.close();
+            document.getElementById('streamIndicator').style.background = "#fee2e2";
+            document.getElementById('streamIndicator').style.color = "#991b1b";
+            document.getElementById('streamIndicator').innerText = "🔴 Pipeline Standby";
+        }
+
+        function connectWebSocket() {
+            socket = new WebSocket(BACKEND_WS_URL);
+            socket.onopen = () => {
+                document.getElementById('streamIndicator').style.background = "#dcfce7";
+                document.getElementById('streamIndicator').style.color = "#15803d";
+                document.getElementById('streamIndicator').innerText = "🟢 Pipeline Connected";
+            };
+            socket.onmessage = (event) => {
+                const payload = JSON.parse(event.data);
+                renderRealTimeData(payload);
+            };
+            socket.onerror = () => { triggerOfflineDegradation(); };
+        }
+
+        function handleTelemetryUpdate(lat, lon) {
+            // Update physical user location marker on the interactive map frame
+            if (!userMarker) {
+                userMarker = L.marker([lat, lon], {title: "Your Location"}).addTo(map);
+            } else {
+                userMarker.setLatLng([lat, lon]);
+            }
+            map.panTo([lat, lon]);
+
+            if (isOffline) {
+                triggerOfflineDegradation();
+            } else if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ lat: lat, lon: lon }));
+            }
+        }
+
+        function renderRealTimeData(frame) {
+            const s = frame.static_infrastructure;
+            const listContainer = document.getElementById('liveDirectoryList');
+            listContainer.innerHTML = '';
+            
+            // Clear prior infrastructure map layers safely
+            infrastructureMarkers.forEach(m => map.removeLayer(m));
+            infrastructureMarkers = [];
+
+            const types = [
+                { name: "Trauma ER", key: 'hospitals', color: '#10b981', iconColor: 'green' },
+                { name: "Police Station", key: 'police', color: '#ef4444', iconColor: 'red' },
+                { name: "Vehicle Towing", key: 'towing', color: '#f59e0b', iconColor: 'orange' },
+                { name: "Puncture Shop", key: 'puncture', color: '#6366f1', iconColor: 'purple' },
+                { name: "Service Center", key: 'showrooms', color: '#06b6d4', iconColor: 'blue' }
             ];
 
-            targets.forEach(t => {
-                if(s[t.key] && s[t.key].length > 0) {
-                    const item = s[t.key][0];
-                    logs.innerHTML += `
-                        <div class="service-card" style="border-left-color: ${t.color}">
-                            <h4>${t.name}: ${item.name}</h4>
-                            <p>📍 Distance: ${item.distance_km || item.dist || 'Localized'} km</p>
-                            <a href="tel:${item.phone}">📞 CALL VERIFIED CONTACT: ${item.phone}</a>
-                        </div>`;
-                } else {
-                    logs.innerHTML += `
-                        <div class="service-card" style="border-left-color: #cbd5e1">
-                            <h4>${t.name}</h4>
-                            <p>No live stations registered within immediate operational geographic boundary filters.</p>
-                        </div>`;
+            types.forEach(t => {
+                if (s[t.key] && s[t.key].length > 0) {
+                    // Iterate through ALL returned items, not just the single closest one!
+                    s[t.key].forEach((item, index) => {
+                        // 1. Append components to live list panel dynamically
+                        listContainer.innerHTML += `
+                            <div class="service-card" style="border-left-color: ${t.color}">
+                                <div class="card-details">
+                                    <h4>[${t.name}] ${item.name}</h4>
+                                    <p>📍 Distance: <b>${item.distance_km || item.dist} km</b></p>
+                                </div>
+                                <a href="tel:${item.phone}" class="call-btn">📞 Call</a>
+                            </div>`;
+
+                        // 2. Plot real-world spatial markers onto the map container frame
+                        if(item.lat && item.lon) {
+                            let marker = L.marker([item.lat, item.lon]).addTo(map)
+                                .bindPopup(`<b>[${t.name}] ${item.name}</b><br>Contact: ${item.phone}`);
+                            infrastructureMarkers.push(marker);
+                        }
+                    });
                 }
             });
-        }
 
-        function setupOfflineSMS() {
-            document.getElementById('smsBox').style.display = 'block';
-            const body = `CRITICAL ROAD SOS. Medical Emergency at GPS Lat:${systemState.lat.toFixed(4)}, Lon:${systemState.lon.toFixed(4)}. Need immediate response execution.`;
-            document.getElementById('smsLink').href = `sms:112?body=${encodeURIComponent(body)}`;
-        }
-
-        function updateEcosystemNodes() {
+            // 3. Dynamic Node 2 updates
             document.getElementById('vanguardStatus').innerHTML = `
-                <div class="status-box">🚨 CRITICAL ACTIVE DISPATCH EN ROUTE</div>
+                <div class="status-box">🚨 INTERCEPT DATA STREAM ACTIVE</div>
                 <div class="service-card" style="border-left-color:var(--primary)">
-                    <h4>Vanguard Student Assigned: Med-Student Responder 1</h4>
-                    <p>Status: Navigating via real-time telemetry array | ETA: 4 Mins</p>
+                    <div class="card-details">
+                        <h4>${frame.vanguard_fleet.name}</h4>
+                        <p>Real-time Target ETA: <b>${frame.vanguard_fleet.eta_minutes} Minutes</b></p>
+                        <p>Tracking Parameters: ${frame.vanguard_fleet.lat.toFixed(4)}, ${frame.vanguard_fleet.lon.toFixed(4)}</p>
+                    </div>
                 </div>`;
 
+            // 4. Dynamic Node 3 updates
             document.getElementById('commandStatus').innerHTML = `
-                <div class="status-box" style="background:#eff6ff; color:#1e40af;">💳 INTEGRATED INDIA STACK LOOP ACTIVE</div>
-                <div class="service-card" style="border-left-color:#10b981">
-                    <h4>Ayushman Bharat (ABHA) Pre-Authorization: PRE-APPROVED</h4>
-                    <p>Allocation Security: ₹50,000 automatic trauma credit assigned to destination ER wall to protect the Golden Hour window.</p>
+                <div class="status-box" style="background:#eff6ff; color:#1e40af;">💳 STACK PROTOCOLS INITIALIZED</div>
+                <div class="service-card" style="border-left-color:var(--success)">
+                    <div class="card-details">
+                        <h4>ABHA Handshake Token: <code>${frame.abha_insurance.secure_token}</code></h4>
+                        <p>Status Indicator: <b>${frame.abha_insurance.status}</b></p>
+                        <p>Emergency Financial Buffer: ₹50,000 trauma protection credit pre-authorized.</p>
+                    </div>
                 </div>`;
+        }
+
+        async function triggerOfflineDegradation() {
+            document.getElementById('networkToggle').checked = true;
+            document.getElementById('offlineBanner').style.display = 'block';
+            const res = await fetch('offline_data.json');
+            const data = await res.json();
+            renderRealTimeData({ static_infrastructure: data, vanguard_fleet: { name: "Local Loop Engaged", eta_minutes: "--", lat: 0, lon: 0 }, abha_insurance: { secure_token: "OFFLINE-LOCAL-CACHE", status: "Bypassed" } });
+            
+            document.getElementById('smsBox').style.display = 'block';
+            const smsText = `CRITICAL SOS: Emergency at coordinates ${systemState.lat}, ${systemState.lon}. Request emergency tracking.`;
+            document.getElementById('smsLink').href = `sms:112?body=${encodeURIComponent(smsText)}`;
+        }
+
+        function simulateMovement() {
+            let fakeLat = 21.1250;
+            let fakeLon = 79.0600;
+            setInterval(() => {
+                if(systemActive) {
+                    fakeLat += (Math.random() - 0.5) * 0.002;
+                    fakeLon += (Math.random() - 0.5) * 0.002;
+                    handleTelemetryUpdate(fakeLat, fakeLon);
+                }
+            }, 3000);
         }
     </script>
 </body>
