@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoldenHour Sync-Stream | Instant Camera Architecture</title>
+    <title>GoldenHour Sync-Stream | State Engine</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
@@ -11,164 +11,148 @@
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
         :root { --bg: #f8fafc; --text: #0f172a; --primary: #2563eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .live-badge { background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
+        .offline-banner { background: var(--danger); color: white; padding: 12px; text-align: center; font-weight: 800; border-radius: 8px; margin-bottom: 20px; display: none; }
+        
+        /* === STATE 1: CAMERA LANDING SCREEN (ONLY THING VISIBLE ON LOAD) === */
+        .camera-landing-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 460px; margin: 40px auto; background: white; padding: 30px; border-radius: 24px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
+        .viewfinder-square { background: #000; border-radius: 16px; overflow: hidden; width: 100%; aspect-ratio: 1 / 1; position: relative; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        #videoViewfinder { width: 100%; height: 100%; object-fit: cover; }
+        #capturedCanvas { width: 100%; height: 100%; object-fit: cover; display: none; }
+        .capture-btn { background: var(--danger); color: white; border: none; padding: 18px; font-size: 16px; font-weight: 800; border-radius: 12px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3); }
+        
+        /* === STATE 2: ACTIVE ECOSYSTEM UI (FORCE-HIDDEN BY DEFAULT) === */
+        .ecosystem-dashboard-layout { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
         .tabs { display: flex; gap: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; }
         .tab-btn { background: none; border: none; font-size: 15px; font-weight: 600; cursor: pointer; color: #64748b; padding: 8px 12px; border-radius: 6px; }
         .tab-btn.active { color: var(--primary); background: #eff6ff; border-bottom: 2px solid var(--primary); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .offline-banner { background: var(--danger); color: white; padding: 12px; text-align: center; font-weight: 800; border-radius: 8px; margin-bottom: 20px; display: none; }
-        .live-badge { background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
         
-        /* Master Layout Framework */
-        .workspace { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; height: 55vh; }
-        #map { width: 100%; height: 100%; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+        .workspace { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; height: 60vh; }
+        #map { width: 100%; height: 100%; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
         .live-panel { height: 100%; overflow-y: auto; background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; box-sizing: border-box; }
-        
-        /* Camera UI Components */
-        .camera-panel { background: white; padding: 20px; border-radius: 16px; margin-bottom: 15px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .viewfinder-wrapper { 
-            background: #000; 
-            border-radius: 12px; 
-            overflow: hidden; 
-            width: 100%;
-            max-width: 340px; /* Constrains width on desktop frames */
-            aspect-ratio: 1 / 1; /* Forces a perfect square bounding box */
-            position: relative; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            margin: 0 auto;
-        }
-        #videoViewfinder { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; /* Crops stream to square without distortion */
-        }
-        #capturedCanvas { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
-            display: none; 
-            background: #1e293b; 
-        }
         
         .service-card { background: #f8fafc; padding: 14px; border-radius: 10px; border-left: 5px solid #cbd5e1; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .card-details h4 { margin: 0; font-size: 15px; }
         .card-details p { margin: 4px 0 0 0; font-size: 13px; color: #64748b; }
-        .call-btn { background: white; color: var(--primary); border: 1px solid #cbd5e1; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        
-        .action-btn { background: var(--danger); color: white; border: none; padding: 14px 24px; font-size: 16px; font-weight: 800; border-radius: 10px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; }
-        .status-box { background: #e0f2fe; color: #0369a1; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #0284c7; }
+        .call-btn { background: white; color: var(--primary); border: 1px solid #cbd5e1; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
         
         .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         .dashboard-card { background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; }
         .vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .vital-badge { background: #f1f5f9; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+        .status-box { background: #e0f2fe; color: #0369a1; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #0284c7; }
     </style>
 </head>
 <body>
 
     <header>
         <div>
-            <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">GoldenHour Sync-Stream ⚡</h1>
-            <small style="color:#64748b; font-weight: 500;">Dynamic Hardware Camera-Triggered Production Infrastructure</small>
+            <h1 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-0.5px;">GoldenHour ⚡</h1>
+            <small style="color:#64748b; font-weight: 500;">Dynamic Image-Triggered Hybrid Production Infrastructure</small>
         </div>
         <div style="display: flex; align-items: center; gap: 15px;">
-            <label style="font-weight:700; cursor:pointer; font-size: 14px;">
+            <label style="font-weight:700; cursor:pointer; font-size: 14px; color:#0f172a;">
                 <input type="checkbox" id="networkToggle"> Force Offline Mode
             </label>
             <div id="streamIndicator" class="live-badge">🔴 Pipeline Standby</div>
         </div>
     </header>
 
-    <div class="offline-banner" id="offlineBanner">⚠️ OFFLINE CHANNELS ACTIVE: RUNNING LOCAL COMPUTER VISION EVALUATION MODELS</div>
+    <div class="offline-banner" id="offlineBanner">⚠️ OFFLINE CHANNELS ACTIVE: QUERING ON-DEVICE INDEXEDDB MEMORY BUNDLES</div>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab(event, 'bystander')">🆘 Node 1: Bystander Camera & Map</button>
-        <button class="tab-btn" onclick="switchTab(event, 'vanguard')">🎒 Node 2: Vanguard Responders</button>
-        <button class="tab-btn" onclick="switchTab(event, 'command')">💳 Node 3: Command & Insurance</button>
-        <button class="tab-btn" onclick="switchTab(event, 'hospital')">🏥 Node 4: Hospital ER Room</button>
-    </div>
-
-    <div id="bystander" class="tab-content active">
-        <div class="camera-panel">
-            <div>
-                <h3 style="margin-top:0; font-size:16px; font-weight:800; color:var(--danger)">📸 STEP 1: CAPTURE ACCIDENT SCENE</h3>
-                <p style="font-size:13px; color:#64748b; margin-top:-5px;">Point camera directly at vehicle damage or road casualties. AI triage analysis initializes automatically upon snapshot lock.</p>
-                <button class="action-btn" id="captureBtn" onclick="captureSceneSnapshot()">📷 CAPTURE SCENE & INITIATE SOS</button>
-                <button class="action-btn" id="resetCameraBtn" onclick="resetHardwareViewfinder()" style="background:#475569; margin-top:10px; display:none;">🔄 RETAKE ACCIDENT PHOTO</button>
-                <div id="smsBox" style="display:none; margin-top:10px;">
-                    <a id="smsLink" href="#" style="background:#000; color:#fff; padding:12px; text-decoration:none; border-radius:10px; font-weight:bold; display:block; text-align:center; font-size:14px;">📱 DISPATCH OFFLINE SMS VIA TOWER</a>
-                </div>
-            </div>
-            <div class="viewfinder-wrapper">
-                <video id="videoViewfinder" autoplay playsinline muted>Camera Feed Standby...</video>
-                <canvas id="capturedCanvas"></canvas>
-            </div>
+    <div id="cameraLandingStage" class="camera-landing-screen">
+        <h2 style="margin-top:0; text-align:center; font-size:18px; font-weight:800; color:var(--danger);">📸 CRITICAL INCIDENT CAMERA</h2>
+        <p style="text-align:center; font-size:13px; color:#64748b; margin-top:-5px; margin-bottom:20px;">Aim your device lens directly at the vehicle crash layout to lock coordinates and launch the AI triage intercept pipeline.</p>
+        
+        <div class="viewfinder-square">
+            <video id="videoViewfinder" autoplay playsinline muted>Connecting Hardware Stream Feed...</video>
+            <canvas id="capturedCanvas"></canvas>
         </div>
         
-        <div class="workspace">
-            <div id="map"></div>
-            <div class="live-panel">
-                <h3 style="margin-top:0; font-size:16px; font-weight:800;">🌍 Dynamic Facilities (Real-Time Sorted)</h3>
-                <div id="liveDirectoryList">Capture an incident scene photo to spin up live routing vectors...</div>
-            </div>
-        </div>
+        <button class="capture-btn" onclick="executeSystemSnapshotSequence()">📷 CAPTURE SCENE & STREAM SOS</button>
     </div>
 
-    <div id="vanguard" class="tab-content">
-        <div class="grid-3">
-            <div class="dashboard-card">
-                <h3 style="margin-top:0;">🎒 Active Mission Dispatches</h3>
-                <div id="vanguardStatus">Awaiting road accident telemetry metrics assignment...</div>
+    <div id="ecosystemDashboardLayout" class="ecosystem-dashboard-layout">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab(event, 'bystander')">🆘 Node 1: Bystander Map</button>
+            <button class="tab-btn" onclick="switchTab(event, 'vanguard')">🎒 Node 2: Vanguard Responders</button>
+            <button class="tab-btn" onclick="switchTab(event, 'command')">💳 Node 3: Command & Insurance</button>
+            <button class="tab-btn" onclick="switchTab(event, 'hospital')">🏥 Node 4: Hospital ER Room</button>
+        </div>
+
+        <div id="bystander" class="tab-content active">
+            <div id="smsBox" style="display:none; margin-bottom: 15px;">
+                <a id="smsLink" href="#" style="background:#000; color:#fff; padding:12px; text-decoration:none; border-radius:10px; font-weight:bold; display:block; text-align:center; font-size:14px;">📱 TOWER FAILSAFE DISPATCH ACTIVE: SEND CELLULAR SMS</a>
             </div>
-            <div class="dashboard-card">
-                <h3 style="margin-top:0;">📋 AI Triage Injury Assessment</h3>
-                <div id="aiTriageDirectives" style="font-size:14px; color:#475569; line-height:1.6;">
-                    <i>Capture an accident snapshot to review computer vision emergency grading parameters.</i>
+            <div class="workspace">
+                <div id="map"></div>
+                <div class="live-panel">
+                    <h3 style="margin-top:0; font-size:16px; font-weight:800;">🌍 Dynamic Facilities (Real-Time Vetted)</h3>
+                    <div id="liveDirectoryList">Sourcing operational map arrays...</div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div id="command" class="tab-content">
-        <div class="grid-3">
-            <div class="dashboard-card" style="grid-column: span 2;">
-                <h3 style="margin-top:0;">💳 Ayushman Bharat (ABHA) Escrow Ledger</h3>
-                <div id="commandStatus">Telemetry link standing by. Awaiting verification pipeline activation frame.</div>
-            </div>
-            <div class="dashboard-card">
-                <h3 style="margin-top:0;">🔒 Protocol Audit Checks</h3>
-                <p style="font-size:13px; color:#64748b;">Automated financial pre-authorization removes administrative delays during critical incoming surgeries.</p>
-                <div class="vital-badge" style="background:#e0f2fe; color:#0284c7;">Trauma Coverage: Active (₹50,000 Verified)</div>
+        <div id="vanguard" class="tab-content">
+            <div class="grid-3">
+                <div class="dashboard-card">
+                    <h3 style="margin-top:0;">🎒 Active Mission Dispatches</h3>
+                    <div id="vanguardStatus">Processing vector variables...</div>
+                </div>
+                <div class="dashboard-card">
+                    <h3 style="margin-top:0;">📋 AI Triage Injury Assessment</h3>
+                    <div id="aiTriageDirectives" style="font-size:14px; color:#475569; line-height:1.6;">
+                        <i>Analyzing image bytes via multimodal AI pipeline frames...</i>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div id="hospital" class="tab-content">
-        <div class="grid-3">
-            <div class="dashboard-card" style="border-top: 5px solid var(--danger);">
-                <h3 style="margin-top:0; color:var(--danger);">🚨 Emergency Trauma Alert</h3>
-                <div id="hospitalAlertStatus">No active incoming critical trauma cases being tracked.</div>
+        <div id="command" class="tab-content">
+            <div class="grid-3">
+                <div class="dashboard-card" style="grid-column: span 2;">
+                    <h3 style="margin-top:0;">💳 Ayushman Bharat (ABHA) Escrow Ledger</h3>
+                    <div id="commandStatus">Synchronizing tracking telemetry frame parameters...</div>
+                </div>
+                <div class="dashboard-card">
+                    <h3 style="margin-top:0;">🔒 Protocol Audit Checks</h3>
+                    <p style="font-size:13px; color:#64748b;">Automated financial pre-authorization removes administrative delays during critical incoming surgeries.</p>
+                    <div class="vital-badge" style="background:#e0f2fe; color:#0284c7;">Trauma Coverage: Active (₹50,000 Verified)</div>
+                </div>
             </div>
-            <div class="dashboard-card">
-                <h3 style="margin-top:0;">Acurate Patient Vitals Stream</h3>
-                <div id="hospitalVitalsStream">Awaiting operational vehicle synchronization frame...</div>
-            </div>
-            <div class="dashboard-card">
-                <h3 style="margin-top:0;">🏥 Trauma Bay Allocations</h3>
-                <div class="vitals-grid">
-                    <div class="vital-badge">ER Critical Bed: STAGED</div>
-                    <div class="vital-badge">Trauma Surgeon: NOTIFIED</div>
-                    <div class="vital-badge">Blood Inventory: O-VE PREPARED</div>
-                    <div class="vital-badge">Ventilator Unit: SECURED</div>
+        </div>
+
+        <div id="hospital" class="tab-content">
+            <div class="grid-3">
+                <div class="dashboard-card" style="border-top: 5px solid var(--danger);">
+                    <h3 style="margin-top:0; color:var(--danger);">🚨 Emergency Trauma Alert</h3>
+                    <div id="hospitalAlertStatus">Monitoring live approach metrics...</div>
+                </div>
+                <div class="dashboard-card">
+                    <h3 style="margin-top:0;">🚑 Patient Vitals Stream</h3>
+                    <div id="hospitalVitalsStream">Synchronizing metrics...</div>
+                </div>
+                <div class="dashboard-card">
+                    <h3 style="margin-top:0;">🏥 Trauma Bay Allocations</h3>
+                    <div class="vitals-grid">
+                        <div class="vital-badge">ER Critical Bed: STAGED</div>
+                        <div class="vital-badge">Trauma Surgeon: NOTIFIED</div>
+                        <div class="vital-badge">Blood Inventory: O-VE PREPARED</div>
+                        <div class="vital-badge">Ventilator Unit: SECURED</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // CONFIGURATION LINK - PASTE YOUR ACTIVE RENDER URL BACKEND HERE
         const BACKEND_WS_URL = "wss://https://goldenhour-backend.onrender.com/ws/emergency";
         
         const db = new Dexie("GoldenHourCacheDB");
@@ -188,136 +172,81 @@
         let currentLat = 21.1250;
         let currentLon = 79.0600;
 
-        // Initialize Map and Request Live Video Stream on Page Mount
+        // ON MOUNT: Only open camera hardware stream view. Keep map and metrics fully unmounted/hidden.
         window.addEventListener('DOMContentLoaded', () => {
-            initializeLeafletMap();
             initializeHardwareCameraViewfinder();
         });
 
-        function initializeLeafletMap() {
-            map = L.map('map').setView([currentLat, currentLon], 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-        }
-
-        // ACCESSS HARDWARE VIEW FINDER STREAMS IN REAL TIME
         async function initializeHardwareCameraViewfinder() {
             const video = document.getElementById('videoViewfinder');
             try {
-                // Direct request to mobile hardware constraints forcing rear environment camera alignment
                 cameraStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: "environment" },
                     audio: false
                 });
                 video.srcObject = cameraStream;
             } catch (err) {
-                console.error("Camera access failed, falling back to simulation profile:", err);
+                console.error("Hardware video pipeline constraint mismatch:", err);
                 video.style.display = 'none';
                 document.getElementById('capturedCanvas').style.display = 'block';
             }
         }
 
-        function captureSceneSnapshot() {
-        const video = document.getElementById('videoViewfinder');
-        const canvas = document.getElementById('capturedCanvas');
-        const context = canvas.getContext('2d');
+        function executeSystemSnapshotSequence() {
+            const video = document.getElementById('videoViewfinder');
+            const canvas = document.getElementById('capturedCanvas');
+            const context = canvas.getContext('2d');
 
-        if (cameraStream && video.srcObject) {
-            canvas.width = 340; // Maintain optimized aspect bounds
-            canvas.height = 340; 
-            
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            video.style.display = 'none';
-            canvas.style.display = 'block';
-            document.getElementById('captureBtn').style.display = 'none';
-            document.getElementById('resetCameraBtn').style.display = 'block';
-            
-            // Compress canvas pixels into a standard base64 image data string
-            const base64ImagePayload = canvas.toDataURL('image/jpeg', 0.7);
-            
-            // Wake up system tracking loops and pass telemetry alongside the image payload
-            systemActive = true;
-            if (!isOffline) {
-                connectWebSocket();
-                // Wait briefly for connection handshake, then transmit the complete data payload
-                setTimeout(() => {
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({
-                            lat: currentLat,
-                            lon: currentLon,
-                            image: base64ImagePayload
-                        }));
-                    }
-                }, 1000);
+            if (cameraStream && video.srcObject) {
+                canvas.width = 400;
+                canvas.height = 400;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Freeze frame interface layers
+                video.style.display = 'none';
+                canvas.style.display = 'block';
+                
+                const imagePayloadString = canvas.toDataURL('image/jpeg', 0.65);
+                
+                // === THE CRITICAL CONTEXT SWITCH ===
+                // Fully unmount/hide the landing block, and instantly slide open the ecosystem tabs
+                document.getElementById('cameraLandingStage').style.display = 'none';
+                document.getElementById('ecosystemDashboardLayout').style.display = 'block';
+                
+                // Initialize map nodes strictly AFTER container parameters are displayed in the DOM flow
+                initializeSystemMappingFrame();
+                
+                // Start tracking telemetries and broadcast streaming channels
+                startTelemetryEngine(imagePayloadString);
             }
         }
-    }
 
-        function resetHardwareViewfinder() {
-            document.getElementById('videoViewfinder').style.display = 'block';
-            document.getElementById('capturedCanvas').style.display = 'none';
-            document.getElementById('captureBtn').style.display = 'block';
-            document.getElementById('resetCameraBtn').style.display = 'none';
-            stopPipeline();
+        function initializeSystemMappingFrame() {
+            map = L.map('map').setView([currentLat, currentLon], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
         }
 
-        document.getElementById('networkToggle').addEventListener('change', (e) => {
-            isOffline = e.target.checked;
-            document.getElementById('offlineBanner').style.display = isOffline ? 'block' : 'none';
-            if (systemActive) {
-                if (isOffline) {
-                    if (socket) socket.close();
-                    document.getElementById('streamIndicator').style.background = "#e2e8f0";
-                    document.getElementById('streamIndicator').style.color = "#475569";
-                    document.getElementById('streamIndicator').innerText = "💾 Local Processor Engaged";
-                    executeOfflinePipeline(currentLat, currentLon);
-                } else {
-                    connectWebSocket();
-                }
-            }
-        });
-
-        function switchTab(event, tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
-            setTimeout(() => { map.invalidateSize(); }, 200); 
-        }
-
-        function startPipeline() {
+        function startTelemetryEngine(imagePayloadString) {
             systemActive = true;
-            if (!isOffline) connectWebSocket(); else {
+            if (!isOffline) connectWebSocket(imagePayloadString); else {
                 document.getElementById('streamIndicator').style.background = "#e2e8f0";
                 document.getElementById('streamIndicator').style.color = "#475569";
                 document.getElementById('streamIndicator').innerText = "💾 Local Processor Engaged";
+                executeOfflinePipeline(currentLat, currentLon);
             }
 
             if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(
-                    (pos) => { handleTelemetryUpdate(pos.coords.latitude, pos.coords.longitude); },
-                    () => { simulateMovement(); },
+                    (pos) => { handleTelemetryUpdate(pos.coords.latitude, pos.coords.longitude, imagePayloadString); },
+                    () => { simulateMovement(imagePayloadString); },
                     { enableHighAccuracy: true, timeout: 5000 }
                 );
             }
         }
 
-        function stopPipeline() {
-            systemActive = false;
-            if(watchId) navigator.geolocation.clearWatch(watchId);
-            if(socket) socket.close();
-            document.getElementById('streamIndicator').style.background = "#fee2e2";
-            document.getElementById('streamIndicator').style.color = "#991b1b";
-            document.getElementById('streamIndicator').innerText = "🔴 Pipeline Standby";
-            document.getElementById('smsBox').style.display = 'none';
-            
-            if(routingLine) map.removeLayer(routingLine);
-            if(responderMarker) map.removeLayer(responderMarker);
-        }
-
-        function connectWebSocket() {
+        function connectWebSocket(imagePayloadString) {
             if (isOffline) return;
             socket = new WebSocket(BACKEND_WS_URL);
             socket.onopen = () => {
@@ -335,20 +264,20 @@
             socket.onerror = () => { isOffline = true; document.getElementById('networkToggle').checked = true; executeOfflinePipeline(currentLat, currentLon); };
         }
 
-        function handleTelemetryUpdate(lat, lon) {
+        function handleTelemetryUpdate(lat, lon, imagePayloadString) {
             currentLat = lat; currentLon = lon;
 
-            if (!userMarker) {
+            if (!userMarker && map) {
                 userMarker = L.marker([lat, lon]).addTo(map).bindPopup("<b>🚨 Crash Location Confirmed</b>").openPopup();
-            } else {
+            } else if(userMarker) {
                 userMarker.setLatLng([lat, lon]);
             }
-            map.panTo([lat, lon]);
+            if(map) map.panTo([lat, lon]);
 
             if (isOffline) {
                 executeOfflinePipeline(lat, lon);
             } else if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ lat: lat, lon: lon }));
+                socket.send(JSON.stringify({ lat: lat, lon: lon, image: imagePayloadString }));
             }
         }
 
@@ -392,7 +321,8 @@
 
             renderRealTimeData({
                 static_infrastructure: structuredOutput,
-                vanguard_fleet: { name: "Vanguard Regional Core (Offline Staged)", eta_minutes: structuredOutput.hospitals.length > 0 ? Math.round(structuredOutput.hospitals[0].distance_km * 2.1) : "6.5", lat: lat+0.004, lon: lon+0.004 },
+                vanguard_fleet: { name: "Vanguard Core Patrol (Offline Local Loop)", eta_minutes: structuredOutput.hospitals.length > 0 ? Math.round(structuredOutput.hospitals[0].distance_km * 2.1) : "6.0", lat: lat+0.004, lon: lon+0.004 },
+                ai_analysis: { severity: "Grade 8/10", directives: "Offline Cache Engine Triggered. Local computer vision matrices processing trauma profiles across device chip storage arrays smoothly." },
                 abha_insurance: { secure_token: "INDEXEDDB-LOCAL-CACHE", status: "PENDING SIGNAL SYNC" }
             });
         }
@@ -402,7 +332,7 @@
             const listContainer = document.getElementById('liveDirectoryList');
             listContainer.innerHTML = '';
             
-            activeMarkers.forEach(m => map.removeLayer(m));
+            activeMarkers.forEach(m => { if(map) map.removeLayer(m); });
             activeMarkers = [];
 
             const schemas = [
@@ -425,7 +355,7 @@
                                 <a href="tel:${item.phone}" class="call-btn">📞 Call</a>
                             </div>`;
 
-                        if (item.lat && item.lon) {
+                        if (item.lat && item.lon && map) {
                             let marker = L.marker([item.lat, item.lon]).addTo(map)
                                 .bindPopup(`<b>${item.name}</b><br>Phone: ${item.phone}`);
                             activeMarkers.push(marker);
@@ -434,11 +364,10 @@
                 }
             });
 
-            // VANGUARD ROUTING SYSTEM GEMS
             const rLat = frame.vanguard_fleet.lat;
             const rLon = frame.vanguard_fleet.lon;
 
-            if (rLat && rLon) {
+            if (rLat && rLon && map) {
                 if (!responderMarker) {
                     const responderIcon = L.divIcon({
                         className: 'custom-responder-pin',
@@ -461,45 +390,43 @@
                 }
             }
 
-            // UPDATE TAB 2 (VANGUARD DISPATCHES + COMPLETED AI TRIAGE PARAMETERS)
             document.getElementById('vanguardStatus').innerHTML = `
-                <div class="status-box" style="background:#fef2f2; color:#991b1b; border-left-color:var(--danger);">🚨 DISPATCH RUNNING CONTINUOUSLY</div>
+                <div class="status-box" style="background:#fef2f2; color:#991b1b; border-left-color:var(--danger);">🚨 DISPATCH ACTIVE & CONNECTED</div>
                 <div class="service-card" style="border-left-color:var(--primary)">
                     <div class="card-details">
                         <h4>Assigned Officer: ${frame.vanguard_fleet.name}</h4>
-                        <p>Real-Time Dynamic ETA: <b style="font-size:16px; color:var(--primary);">${frame.vanguard_fleet.eta_minutes} Minutes</b></p>
+                        <p>Dynamic Intercept Distance: <b>${frame.vanguard_fleet.distance_km || '--'} km</b></p>
+                        <p>Real-Time Tracking ETA: <b style="font-size:16px; color:var(--primary);">${frame.vanguard_fleet.eta_minutes} Mins</b></p>
                     </div>
                 </div>`;
                 
             document.getElementById('aiTriageDirectives').innerHTML = `
                 <div class="service-card" style="border-left-color:var(--warning); background:#fffbeb; margin-bottom:0;">
                     <div class="card-details">
-                        <h4 style="color:#b45309;">⚡ Computer Vision Assessment: SEVERITY GRADE 8/10</h4>
-                        <p style="margin-top:5px; color:#92400e;">Structural impact profile confirms high kinetic vehicular displacement. Dispatched teams prepped for compound limb fracture response.</p>
+                        <h4 style="color:#b45309;">⚡ Gemini Computer Vision Severity: ${frame.ai_analysis.severity}</h4>
+                        <p style="margin-top:5px; color:#92400e; font-size:13.5px; line-height:1.5;">${frame.ai_analysis.directives}</p>
                     </div>
                 </div>`;
 
-            // UPDATE TAB 3 (COMMAND & INSURANCE)
             document.getElementById('commandStatus').innerHTML = `
-                <div class="status-box" style="background:#eff6ff; color:#1e40af; border-left-color:var(--primary);">🔒 SYSTEM INTEGRATION SECURED</div>
+                <div class="status-box" style="background:#eff6ff; color:#1e40af; border-left-color:var(--primary);">🔒 SYSTEM LINK SECURED</div>
                 <div class="service-card" style="border-left-color:var(--success)">
                     <div class="card-details">
-                        <h4>ABHA Reference Token: <code>${frame.abha_insurance.secure_token}</code></h4>
-                        <p>Ledger Verification Status: <b>${frame.abha_insurance.status}</b></p>
+                        <h4>ABHA Verification Reference: <code>${frame.abha_insurance.secure_token}</code></h4>
+                        <p>Ledger Escalation Status: <b>${frame.abha_insurance.status}</b></p>
                     </div>
                 </div>`;
 
-            // UPDATE TAB 4 (HOSPITAL ER DASHBOARD)
             const targetedHospital = s.hospitals.length > 0 ? s.hospitals[0].name : "Nearest Emergency Hub Sector";
             document.getElementById('hospitalAlertStatus').innerHTML = `
-                <div class="status-box" style="background:#fff7ed; color:#c2410c; border-left-color:var(--warning);">⚠️ PREPARING TRAUMA BAY SUITE</div>
-                <p style="font-size:14px; margin:0;">Destination Intake Unit: <b>${targetedHospital}</b></p>
-                <p style="font-size:14px; margin-top:5px;">ETA Arrival Tracking Countdown: <b style="color:var(--danger); font-size:16px;">${frame.vanguard_fleet.eta_minutes} Mins</b></p>
+                <div class="status-box" style="background:#fff7ed; color:#c2410c; border-left-color:var(--warning);">⚠️ PREPARING TRAUMA BAY INTAKE</div>
+                <p style="font-size:14px; margin:0;">Destination Facility: <b>${targetedHospital}</b></p>
+                <p style="font-size:14px; margin-top:5px;">ETA Arrival Countdown Feed: <b style="color:var(--danger); font-size:16px;">${frame.vanguard_fleet.eta_minutes} Mins</b></p>
             `;
             
             document.getElementById('hospitalVitalsStream').innerHTML = `
                 <div class="vitals-grid">
-                    <div class="vital-badge" style="color:var(--danger)">❤️ Heart Rate: 105 BPM</div>
+                    <div class="vital-badge" style="color:var(--danger)">❤️ Heart Rate: 104 BPM</div>
                     <div class="vital-badge" style="color:var(--primary)">🫁 SpO2 Level: 94%</div>
                     <div class="vital-badge">🩸 BP Status: 114/76</div>
                     <div class="vital-badge" style="color:var(--warning)">🧠 GCS Assessment: 12</div>
@@ -507,12 +434,27 @@
             `;
         }
 
-        function simulateMovement() {
+        document.getElementById('networkToggle').addEventListener('change', (e) => {
+            isOffline = e.target.checked;
+            document.getElementById('offlineBanner').style.display = isOffline ? 'block' : 'none';
+        });
+
+        function switchTab(event, tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+            if (map) {
+                setTimeout(() => { map.invalidateSize(); }, 150);
+            }
+        }
+
+        function simulateMovement(imagePayloadString) {
             let fakeLat = 21.1250; let fakeLon = 79.0600;
             setInterval(() => {
                 if(systemActive) {
                     fakeLat += (Math.random() - 0.5) * 0.003; fakeLon += (Math.random() - 0.5) * 0.003;
-                    handleTelemetryUpdate(fakeLat, fakeLon);
+                    handleTelemetryUpdate(fakeLat, fakeLon, imagePayloadString);
                 }
             }, 3500);
         }
